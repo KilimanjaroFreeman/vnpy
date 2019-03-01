@@ -1,0 +1,38 @@
+{
+    "working": true,
+    "marketCloseTime": "15:05:00",
+    "nightCloseTime": "02:31:00",
+    
+    "tick":
+    [
+    ],
+
+    "bar":
+    [
+        ["rb1905", "CTP"],
+        ["hc1905", "CTP"],
+        ["i1905", "CTP"],
+        ["MA905", "CTP"],
+        ["jd1905", "CTP"],
+        ["c1905", "CTP"],
+        ["SR905", "CTP"],
+        ["TA905", "CTP"],
+        ["bu1906", "CTP"],
+        ["ZC905", "CTP"],
+        ["fu1905", "CTP"],
+        ["ni1905", "CTP"],
+        ["IF1904", "CTP"],
+        ["IF1903", "CTP"],
+        ["IF1905", "CTP"],
+	["FG905", "CTP"],
+	["y1905", "CTP"],
+	["a1905", "CTP"],
+	["sp1906", "CTP"]
+
+    ],
+
+    "active":
+    {
+    
+    }
+}
