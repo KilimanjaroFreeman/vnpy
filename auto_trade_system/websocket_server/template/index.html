@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>陈城华</title>
+</head>
+<body>
+
+<div>
+    <input id="name"/>
+    <input id="password"/>
+    <button id="do">登陆</button>
+</div>
+
+</body>
+<script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+
+<script>
+   
+
+$(function() {
+    //执行
+    $('#do').click(function() {
+        //获取
+        var name=$('#name').val()
+        var password=$('#password').val()
+        console.log(name,password)
+        login(name, password)
+    })
+})
+
+//登陆连接
+function login(name, password) {
+    var url = "http://localhost:9001/login"
+    $.post(url, {"name": name, "password": password},function(){
+        //接收到数据进行处理
+        
+        WebSocketTest()
+    });
+}
+
+function WebSocketTest()
+         {
+            if ("WebSocket" in window)
+            {
+                //alert 表示弹出警示窗口
+               //alert("您的浏览器支持 WebSocket!");
+               
+               // 打开一个 web socket
+               //var ws = new WebSocket("ws://119.145.10.4:9999/dzkj-st/myHandler");
+               var ws = new WebSocket("ws://localhost:9001/webSocket");
+               ws.onopen = function()
+               {
+                  // Web Socket 已连接上，使用 send() 方法发送数据
+                  //ws.send("发送数据");
+                  //alert("数据发送中...");
+               };
+                
+               ws.onmessage = function (evt) 
+               { 
+                  var received_msg = evt.data;
+				  console.log(new Date(),received_msg)
+               };
+                ws.onerror = (e) => {
+					console.log(e)
+					alert("连接错误");
+				}
+               ws.onclose = function(e)
+               { 
+				  console.log('websocket 断开: ' + e.code + ' ' + e.reason + ' ' + e.wasClean)
+                  // 关闭 websocket
+                  //alert("连接已关闭..."); 
+               };
+            }
+            
+            else
+            {
+               // 浏览器不支持 WebSocket
+               alert("您的浏览器不支持 WebSocket!");
+            }
+         }
+</script>
+
+
+</html>

@@ -1,0 +1,62 @@
+[
+    {
+        "className": "DeviationShortStrategy_IF_1min", 
+        "name": "DeviationShortStrategy_IF_1min", 
+        "vtSymbol": "IF1903",
+	"status": "run"
+    }, 
+    {
+        "className": "DualThrustStrategy_IF_1min", 
+        "name": "DualThrustStrategy_IF_1min", 
+        "vtSymbol": "IF1903",
+        "alpha": "IF", 
+        "fixedSize": 1, 
+        "initDays": 20, 
+        "status": "run"
+    }, 
+    {
+        "className": "MoveBollStrategy_IF_15min", 
+        "name": "MoveBollStrategy_IF_15min", 
+        "vtSymbol": "IF1903",
+        "alpha": "IF", 
+        "fixedSize": 1, 
+        "initDays": 20, 
+        "status": "run"
+    }, 
+    {
+        "className": "SpeicalVolatilityShortStrategy_IF_1min", 
+        "name": "SpeicalVolatilityShortStrategy_IF_1min", 
+        "vtSymbol": "IF1903",
+        "alpha": "IF", 
+        "fixedSize": 1, 
+        "initDays": 20, 
+        "status": "run"
+    }, 
+    {
+        "className": "RBreakerStrategy_IF_1min", 
+        "name": "RBreakerStrategy_IF_1min", 
+        "vtSymbol": "IF1903",
+        "alpha": "IF", 
+        "fixedSize": 1, 
+        "initDays": 20, 
+        "status": "run"
+    }, 
+    {
+        "className": "UnilateralTrendStrategy_IF_30min", 
+        "name": "UnilateralTrendStrategy_IF_30min", 
+        "vtSymbol": "IF1903",
+        "alpha": "IF", 
+        "fixedSize": 1, 
+        "initDays": 20, 
+        "status": "run"
+    }, 
+    {
+        "className": "MarketStableStrategy", 
+        "name": "MarketStableStrategy_IF_1min", 
+        "vtSymbol": "IF1903",
+        "alpha": "IF", 
+        "fixedSize": 1, 
+        "initDays": 20, 
+        "status": "run"
+    }
+]

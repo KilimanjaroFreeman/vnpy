@@ -1,0 +1,39 @@
+{
+     "account": ["test_account"],
+     "plot_setting": {
+	     "TrendTunnelStrategy": [
+		     {
+			"name": "净值",
+		      	"key": "pnl_ratio",
+		      	"align": "right"
+		      },
+		      {
+			"name": "分时价格",
+			"key": "last_price",
+			"align": "left"
+		      },
+		      {
+			"name": "开仓通道上沿",
+			"key": "open_tunnel_up",
+			"align": "left"
+		      },
+    		      {
+			"name": "开仓通道下沿",
+			"key": "open_tunnel_down",
+			"align": "left"
+		     },
+		      {
+			"name": "平仓通道上沿",
+			"key": "close_tunnel_up",
+			"align": "left"
+		      },
+    		      {
+			"name": "平仓通道下沿",
+			"key": "close_tunnel_down",
+			"align": "left"
+		     }]
+	}
+}
+
+
+

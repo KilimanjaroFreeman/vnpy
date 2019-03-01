@@ -1,0 +1,50 @@
+[
+     {
+          "className": "TrendTunnelStrategy", 
+          "name": "TrendTunnelStrategy_bu_30min", 
+          "vtSymbol": "bu1906", 
+          "alpha": "bu", 
+          "fixedSize": 2, 
+          "initDays": 50, 
+	  "status": "run",
+          "closePeriod": 30, 
+          "openPeriod": 30, 
+          "tradeMode": -1
+     }, 
+     {
+          "className": "TrendTunnelStrategy", 
+          "name": "TrendTunnelStrategy_sp_30min", 
+          "vtSymbol": "sp1906", 
+          "alpha": "sp", 
+          "fixedSize": 2, 
+          "initDays": 50, 
+	  "status": "run",
+          "closePeriod": 30, 
+          "openPeriod": 30, 
+          "tradeMode": -1
+     }, 
+     {
+          "className": "TrendTunnelStrategy", 
+          "name": "TrendTunnelStrategy_a_15min", 
+          "vtSymbol": "a1905", 
+          "alpha": "a", 
+          "fixedSize": 2, 
+          "initDays": 50, 
+	  "status": "stop",
+          "closePeriod": 15, 
+          "openPeriod": 15, 
+          "tradeMode": 1
+     }, 
+     {
+          "className": "TrendTunnelStrategy", 
+          "name": "TrendTunnelStrategy_TA_30min", 
+          "vtSymbol": "TA905", 
+          "alpha": "TA", 
+          "fixedSize": 2, 
+          "initDays": 50, 
+	  "status": "stop",
+          "closePeriod": 30, 
+          "openPeriod": 30, 
+          "tradeMode": -1
+     }
+]

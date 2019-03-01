@@ -1,0 +1,59 @@
+2019-02-17 20:45:00,139  INFO: 启动CTA策略运行子进程
+2019-02-17 20:45:00,139  INFO: 事件引擎创建成功
+2019-02-17 20:45:00,154  INFO: 主引擎创建成功
+2019-02-17 20:45:00,154  INFO: 注册日志事件监听
+2019-02-17 20:45:00,158  INFO: 连接CTP接口
+2019-02-17 20:45:00,160  INFO: MAIN_ENGINE	MongoDB连接成功
+2019-02-17 20:45:00,192  INFO: CTP	交易服务器连接成功
+2019-02-17 20:45:00,193  INFO: CTP	行情服务器连接成功
+2019-02-17 20:45:00,226  INFO: CTP	交易服务器登录完成
+2019-02-17 20:45:00,227  INFO: CTP	行情服务器登录完成
+2019-02-17 20:45:00,260  INFO: CTP	结算信息确认完成
+2019-02-17 20:45:00,763  INFO: CTP	交易合约信息获取完成
+2019-02-17 20:45:10,181  INFO: CTA策略载入成功
+2019-02-17 20:45:10,183  INFO: CTA_STRATEGY	BollFltStrategy_ni_15min:BollFltStrategy_ni_15min策略初始化
+2019-02-17 20:45:10,183  INFO: CTA_STRATEGY	BollFltStrategy_ni_15min:BollFltStrategy_ni_15min读取合约参数
+2019-02-17 20:45:10,870  INFO: CTA_STRATEGY	BollFltStrategy_ZC_30min:BollFltStrategy_ZC_30min策略初始化
+2019-02-17 20:45:10,870  INFO: CTA_STRATEGY	BollFltStrategy_ZC_30min:BollFltStrategy_ZC_30min读取合约参数
+2019-02-17 20:45:11,379  INFO: CTA_STRATEGY	DoubleMaStrategy_bu_Daily:DoubleMaStrategy_bu_Daily策略初始化
+2019-02-17 20:45:11,379  INFO: CTA_STRATEGY	DoubleMaStrategy_bu_Daily:DoubleMaStrategy_bu_Daily读取合约参数
+2019-02-17 20:45:11,981  INFO: CTA_STRATEGY	DoubleMaStrategy_hc_15min:DoubleMaStrategy_hc_15min策略初始化
+2019-02-17 20:45:11,981  INFO: CTA_STRATEGY	DoubleMaStrategy_hc_15min:DoubleMaStrategy_hc_15min读取合约参数
+2019-02-17 20:45:12,452  INFO: CTA_STRATEGY	DoubleMaStrategy_TA_15min:DoubleMaStrategy_TA_15min策略初始化
+2019-02-17 20:45:12,452  INFO: CTA_STRATEGY	DoubleMaStrategy_TA_15min:DoubleMaStrategy_TA_15min读取合约参数
+2019-02-17 20:45:12,984  INFO: CTA_STRATEGY	BollFltStrategy_i_15min:BollFltStrategy_i_15min策略初始化
+2019-02-17 20:45:12,984  INFO: CTA_STRATEGY	BollFltStrategy_i_15min:BollFltStrategy_i_15min读取合约参数
+2019-02-17 20:45:13,578  INFO: CTA_STRATEGY	BollFltStrategy_jd_15min:BollFltStrategy_jd_15min策略初始化
+2019-02-17 20:45:13,579  INFO: CTA_STRATEGY	BollFltStrategy_jd_15min:BollFltStrategy_jd_15min读取合约参数
+2019-02-17 20:45:13,916  INFO: CTA_STRATEGY	BollFltStrategy_rb_15min:BollFltStrategy_rb_15min策略初始化
+2019-02-17 20:45:13,916  INFO: CTA_STRATEGY	BollFltStrategy_rb_15min:BollFltStrategy_rb_15min读取合约参数
+2019-02-17 20:45:14,498  INFO: CTA_STRATEGY	DoubleMaStrategy_MA_Daily:DoubleMaStrategy_MA_Daily策略初始化
+2019-02-17 20:45:14,498  INFO: CTA_STRATEGY	DoubleMaStrategy_MA_Daily:DoubleMaStrategy_MA_Daily读取合约参数
+2019-02-17 20:45:14,951  INFO: CTA_STRATEGY	DoubleMaStrategy_SR_15min:DoubleMaStrategy_SR_15min策略初始化
+2019-02-17 20:45:14,952  INFO: CTA_STRATEGY	DoubleMaStrategy_SR_15min:DoubleMaStrategy_SR_15min读取合约参数
+2019-02-17 20:45:15,488  INFO: CTA_STRATEGY	BollFltStrategy_c_Daily:BollFltStrategy_c_Daily策略初始化
+2019-02-17 20:45:15,488  INFO: CTA_STRATEGY	BollFltStrategy_c_Daily:BollFltStrategy_c_Daily读取合约参数
+2019-02-17 20:45:16,136  INFO: CTA_STRATEGY	BollFltStrategy_fu_15min:BollFltStrategy_fu_15min策略初始化
+2019-02-17 20:45:16,136  INFO: CTA_STRATEGY	BollFltStrategy_fu_15min:BollFltStrategy_fu_15min读取合约参数
+2019-02-17 20:45:16,716  INFO: CTA策略初始化成功
+2019-02-17 20:45:16,717  INFO: CTA_STRATEGY	BollFltStrategy_ni_15min:BollFltStrategy_ni_15min策略启动
+2019-02-17 20:45:16,717  INFO: CTA_STRATEGY	BollFltStrategy_ZC_30min:BollFltStrategy_ZC_30min策略启动
+2019-02-17 20:45:16,717  INFO: CTA_STRATEGY	DoubleMaStrategy_bu_Daily:DoubleMaStrategy_bu_Daily策略启动
+2019-02-17 20:45:16,717  INFO: CTA_STRATEGY	DoubleMaStrategy_hc_15min:DoubleMaStrategy_hc_15min策略启动
+2019-02-17 20:45:16,718  INFO: CTA策略启动成功
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	DoubleMaStrategy_TA_15min:DoubleMaStrategy_TA_15min策略启动
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	BollFltStrategy_i_15min:BollFltStrategy_i_15min策略启动
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	BollFltStrategy_jd_15min:BollFltStrategy_jd_15min策略启动
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	BollFltStrategy_rb_15min:BollFltStrategy_rb_15min策略启动
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	DoubleMaStrategy_MA_Daily:DoubleMaStrategy_MA_Daily策略启动
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	DoubleMaStrategy_SR_15min:DoubleMaStrategy_SR_15min策略启动
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	BollFltStrategy_c_Daily:BollFltStrategy_c_Daily策略启动
+2019-02-17 20:45:16,718  INFO: CTA_STRATEGY	BollFltStrategy_fu_15min:BollFltStrategy_fu_15min策略启动
+2019-02-17 23:01:31,010  INFO: CTP	行情服务器连接断开
+2019-02-17 23:01:31,043  INFO: CTP	行情服务器连接成功
+2019-02-17 23:01:31,076  INFO: CTP	行情服务器登录完成
+2019-02-17 23:02:03,081  INFO: CTP	交易服务器连接断开
+2019-02-17 23:02:03,087  INFO: CTP	交易服务器连接成功
+2019-02-17 23:02:03,152  INFO: CTP	交易服务器登录完成
+2019-02-17 23:02:03,161  INFO: CTP	结算信息确认完成
+2019-02-17 23:02:03,674  INFO: CTP	交易合约信息获取完成
