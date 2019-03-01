@@ -3,7 +3,6 @@
 '''
 动态载入所有的策略类
 '''
-from __future__ import print_function
 
 import os
 import importlib

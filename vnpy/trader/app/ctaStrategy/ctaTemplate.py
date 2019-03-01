@@ -4,14 +4,20 @@
 本文件包含了CTA引擎中的策略开发用模板，开发策略时需要继承CtaTemplate类。
 '''
 
+from pymongo import MongoClient, ASCENDING
+from collections import OrderedDict
 import numpy as np
-import talib
+from datetime import datetime, time, timedelta
+import time as time_stmp
+import pymongo
+import copy
+import urllib2
+import sys
+import json
 
 from vnpy.trader.vtConstant import *
-from vnpy.trader.vtObject import VtBarData
-
+from vnpy.trader.vtUtility import BarGenerator, ArrayManager
 from .ctaBase import *
-
 
 ########################################################################
 class CtaTemplate(object):
@@ -200,8 +206,294 @@ class CtaTemplate(object):
         """查询最小价格变动"""
         return self.ctaEngine.getPriceTick(self)
         
+    #---------------------------------------------------------------------
+    #-----------------------自己添加的函数---------------------------------
+    #----------------------------------------------------------------------
+    def insertTrade(self,DBName, vtStrategy, trade):
+        """向数据库中插入交易记录"""
+        trade_data = copy.deepcopy(trade)
+        trade_data.trade_date = datetime.now().strftime('%Y%m%d')
+        trade_data.datetime = datetime.now()
 
+        if 'dt' not in dir(trade):
+            dt = trade_data.trade_date + ' ' + trade.tradeTime
+            trade_data.dt = datetime.strptime(dt,'%Y%m%d %H:%M:%S')
+            
+        self.ctaEngine.insertData(DBName, vtStrategy, trade_data)
+        
+    #---------------------------------------------------------------------
+    def saveRealtimeStrategyInfor(self):
+        """向数据库中插入策略的实时信息"""
+        DBName = 'Realtime_Strategy_Information'
+        TBName = self.name
+        d = {}
+        d['name'] = self.name
+        d['vtSymbol'] = self.vtSymbol
 
+        for key in self.syncList:
+            d[key] = self.__getattribute__(key)
+
+        self.ctaEngine.insertData(DBName, TBName, d)
+
+    #---------------------------------------------------------------------
+    def caculateAccountNoTrade(self, bar):
+        """没有成交时，每一个bar账户明细改变"""
+        total_pos_no_trade = abs(self.pos_long) + abs(self.pos_short)
+        
+        if total_pos_no_trade > 0:
+            long_ratio = np.true_divide(abs(self.pos_long), total_pos_no_trade)
+            short_ratio = np.true_divide(abs(self.pos_short), total_pos_no_trade)
+        else:
+            long_ratio = 0
+            short_ratio = 0
+        
+        #多头仓位和空头仓位价格变化对账户余额的影响
+        d_long = bar.close * self.trade_size * abs(self.pos_long) - long_ratio * self.deposit / self.deposit_ratio
+        d_short = short_ratio * self.deposit / self.deposit_ratio - bar.close * self.trade_size * abs(self.pos_short)
+        d_d = d_long + d_short
+        self.capital = self.capital + d_d
+        self.deposit = bar.close * self.trade_size * self.deposit_ratio * total_pos_no_trade
+        self.cash = self.capital - self.deposit
+        self.account_datetime = datetime.now()
+        
+        # 同步变量到数据库
+        self.saveSyncData()
+        
+    #------------------------------------------------------------------------
+    def caculateAccountTrade(self, trade):
+        """成交时，账户明细改变"""
+        
+        #成交前账户信息
+        total_pos_no_trade = abs(self.pos_long) + abs(self.pos_short)
+        
+        if total_pos_no_trade > 0:
+            long_ratio = np.true_divide(abs(self.pos_long), total_pos_no_trade)
+            short_ratio = np.true_divide(abs(self.pos_short), total_pos_no_trade)
+        else:
+            long_ratio = 0
+            short_ratio = 0
+        
+        #多头仓位和空头仓位价格变化对账户余额的影响
+        d_long = trade.price * self.trade_size * abs(self.pos_long) - long_ratio * self.deposit / self.deposit_ratio
+        d_short = short_ratio * self.deposit / self.deposit_ratio - trade.price * self.trade_size * abs(self.pos_short)
+        d_d = d_long + d_short
+        self.capital = self.capital + d_d
+        self.deposit = trade.price * self.trade_size * self.deposit_ratio * total_pos_no_trade
+        self.cash = self.capital - self.deposit
+
+        #更改多空仓位信息
+        if trade.offset == u'开仓': 
+            if trade.direction == u'多':
+                self.pos_long += abs(trade.volume)
+            elif trade.direction == u'空':
+                self.pos_short += abs(trade.volume)
+        else:
+            if trade.direction == u'多':
+                self.pos_short -= abs(trade.volume)
+            elif trade.direction == u'空':
+                self.pos_long -= abs(trade.volume)
+                
+        total_pos = abs(self.pos_long) + abs(self.pos_short)
+        
+        #成交后账户信息
+        if trade.offset == u'开仓':
+            d_1 = trade.price * self.trade_size * self.deposit_ratio * abs(trade.volume)
+            self.cash = self.cash - d_1 - (d_1 / self.deposit_ratio * self.rate)        #扣除手续费
+            self.deposit = trade.price * self.trade_size * self.deposit_ratio * total_pos
+            self.capital = self.cash + self.deposit
+        else:
+            d_1 = trade.price * self.trade_size * self.deposit_ratio * abs(trade.volume)
+            self.cash = self.cash + d_1 - (d_1 / self.deposit_ratio * self.rate)         #扣除手续费
+            self.deposit = trade.price * self.trade_size * self.deposit_ratio * total_pos
+            self.capital = self.cash + self.deposit
+            
+        self.account_datetime = datetime.now()
+
+        # 同步变量到数据库
+        self.saveSyncData()
+    
+    #---------------------------------------------------------------------------------
+    def loadContractDetail(self, sym):
+        try:
+            # 设置MongoDB操作的超时时间为0.5秒
+            dbClient = MongoClient('localhost', 27017, connectTimeoutMS=500)
+            
+            # 调用server_info查询服务器状态，防止服务器异常并未连接成功
+            dbClient.server_info()
+        except ConnectionFailure:
+            print u'读取合约连接数据库失败'
+            
+        if dbClient:
+            db = dbClient['VnTrader_Contract']
+            collection = db['Detail']
+            #回测模式下self.vtSymbol为空
+            if self.vtSymbol:
+                symbol = ''.join([x for x in self.vtSymbol if x.isalpha()])
+            else:
+                symbol = sym
+            flt = {'symbol': symbol}
+            cursor = collection.find(flt)
+            if cursor:
+                Data = list(cursor)
+            else:
+                Data = []
+        else:
+            print u'读取合约参数失败'
+            Data = []
+        
+        if not Data:
+            return
+        
+        d = Data[0]
+        self.trade_size = d['trade_size']
+        self.deposit_ratio = d['deposit_ratio']
+        self.tickPrice = d['price_tick']
+
+    #--------------------------------------------------------------------------------
+    def send_strategy_account_to_bg(self):
+        '''把策略的账户信息发送到后端监控'''
+        try:
+            dt = self.account_datetime.replace(second=0, microsecond=0)
+            dt = int(time_stmp.mktime(dt.timetuple())) * 1000             #毫秒级别时间戳
+            url_1 = u'http://192.168.10.132:8888/dzkj-st/strategyDataStatistics/addPersonStrategyData?'
+            url_2 = (u'time=%d&strategy_name=%s&long_pos=%s&short_pos=%s&init_money=%.2f&acculumate_net=%.2f&stock_index_futures=%s'\
+                    %(dt, self.className, self.pos_long, self.pos_short, self.original_capital, self.capital, self.last_price))
+            url = url_1 + url_2
+            req = urllib2.Request(url)
+            response = urllib2.urlopen(req)
+            html = response.read()
+            return html
+        except:
+            print u'datetime %s: 发送策略账户到后端失败'%datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+    #---------------------------------------------------------------------------------
+    def closePositionAndStop(self, bar):
+        """紧急操作，平掉策略仓位并且停止策略"""
+        # 当前持有多头头寸
+        if self.pos_long != 0 and self.trading:
+            #平多
+            self.sell(bar.close - self.slip, abs(self.pos_long), False)
+         
+        # 当前持有空头头寸
+        if self.pos_short != 0 and self.trading:
+            #平空
+            self.cover(bar.close + self.slip, abs(self.pos_short), False)
+        
+        #如果仓位为0，停止策略
+        if self.pos_long == 0 and self.pos_short == 0 and self.trading:
+            self.trading = False
+        
+    def replaceDominantContract(self, bar):
+        """更换主力合约，平掉当前头寸，更改配置文件"""
+        if self.pos_long != 0 and self.trading:
+            #平多
+            self.sell(bar.close - self.slip, abs(self.pos_long), False)
+
+        if self.pos_short != 0 and self.trading:
+            #平空
+            self.cover(bar.close + self.slip, abs(self.pos_short), False)
+
+        #如果仓位为0
+        if self.pos_long == 0 and self.pos_short == 0 and self.trading:
+            #更新数据库
+            try:
+                old_symbol = self.replaceContract['old_contract']
+                new_symbol = self.replaceContract['new_contract']
+                self._database_handle(old_symbol, new_symbol)
+            except:
+                print('%s数据库更新失败'%self.name)
+                return
+    
+            #更新配置文件
+            self._json_handle(self.name, new_symbol)
+
+    #--------------------------------------------------------------------------------------
+    def _json_handle(self, strategy_name, new_symbol):
+        """更改json配置文件，更新主力合约号"""
+        file_dir = r'./CTA_setting.json'
+        f = file(file_dir)
+        strategy_list = json.load(f)
+ 
+        for n, d in enumerate(strategy_list):
+            if d['name'] == strategy_name:
+                d['vtSymbol'] = new_symbol
+                d['status'] = 'run'
+                #删除更改主力合约标志
+                try:
+                    del d['replaceContract']
+                except:
+                    pass
+
+        strategy_list = map(self._order_dict, strategy_list)
+
+        with open(file_dir, 'w') as f:
+            jsonL = json.dumps(strategy_list, indent=5)
+            f.write(jsonL)
+            print(u"%s配置文件更新成功"%self.name)
+
+    #------------------------------------------------------------------------
+    def _order_dict(self, d):
+        """把字典转化为顺序字典方便显示"""
+        new_d = OrderedDict()
+        new_d['className'] = d['className']
+        new_d['name'] = d['name']
+        new_d['vtSymbol'] = d['vtSymbol']
+        new_d['alpha'] = d['alpha']
+        new_d['fixedSize'] = d['fixedSize']
+        new_d['initDays'] = d['initDays']
+        new_d['status'] = d['status']
+        
+        del d['className']
+        del d['name']
+        del d['vtSymbol'] 
+        del d['alpha']
+        del d['fixedSize']
+        del d['initDays']
+        del d['status']
+        
+        for k in d:
+            new_d[k] = d[k]
+            
+        return new_d
+
+    #----------------------------------------------------------------------------------------
+    def _database_handle(self,  old_symbol, new_symbol):
+        """如果需要更换主力合约， 把旧合约的账户信息复制到新合约的数据库中"""
+        try:
+            dbClient = MongoClient('localhost', 27017, connectTimeOutMS=500)
+            # 调用server_info查询服务器状态， 防止服务器异常并未连接成功
+            dbClient.server_info()
+        except ConnectionFailure:
+            print u'读取合约连接数据库失败'
+            
+        if dbClient:
+            db=dbClient['VnTrader_Position_Db']
+            collection = db[self.className]
+            flt = {'name': self.name, 'vtSymbol': old_symbol}
+            cursor = collection.find(flt)
+            
+            try:
+                d = list(cursor)[0]
+            except:
+                pass
+
+            new_d = {}
+            new_d['pos'] = 0
+            new_d['pos_long'] = 0
+            new_d['pos_short'] = 0
+            new_d['deposit'] = 0
+            new_d['cash'] = d['capital']
+            new_d['capital'] = d['capital']
+            new_d['original_capital'] = d['original_capital']
+            new_d['vtSymbol'] = new_symbol
+            new_d['name'] = d['name']
+            new_d['account_datetime'] = d['account_datetime']
+            
+            flt = {'name': d['name'], 'vtSymbol': new_symbol}
+            collection.replace_one(flt, new_d, upsert=True)
+            print(u"%s数据库更换主力合约成功"%d['name'])
+        dbClient.close()
+        
 ########################################################################
 class TargetPosTemplate(CtaTemplate):
     """
@@ -340,282 +632,6 @@ class TargetPosTemplate(CtaTemplate):
                     l = self.short(shortPrice, abs(posChange))
             self.orderList.extend(l)
     
-    
-########################################################################
-class BarGenerator(object):
-    """
-    K线合成器，支持：
-    1. 基于Tick合成1分钟K线
-    2. 基于1分钟K线合成X分钟K线（X可以是2、3、5、10、15、30	）
-    """
-
-    #----------------------------------------------------------------------
-    def __init__(self, onBar, xmin=0, onXminBar=None):
-        """Constructor"""
-        self.bar = None             # 1分钟K线对象
-        self.onBar = onBar          # 1分钟K线回调函数
-        
-        self.xminBar = None         # X分钟K线对象
-        self.xmin = xmin            # X的值
-        self.onXminBar = onXminBar  # X分钟K线的回调函数
-        
-        self.lastTick = None        # 上一TICK缓存对象
-        
-    #----------------------------------------------------------------------
-    def updateTick(self, tick):
-        """TICK更新"""
-        newMinute = False   # 默认不是新的一分钟
-        
-        # 尚未创建对象
-        if not self.bar:
-            self.bar = VtBarData()
-            newMinute = True
-        # 新的一分钟
-        elif self.bar.datetime.minute != tick.datetime.minute:
-            # 生成上一分钟K线的时间戳
-            self.bar.datetime = self.bar.datetime.replace(second=0, microsecond=0)  # 将秒和微秒设为0
-            self.bar.date = self.bar.datetime.strftime('%Y%m%d')
-            self.bar.time = self.bar.datetime.strftime('%H:%M:%S.%f')
-            
-            # 推送已经结束的上一分钟K线
-            self.onBar(self.bar)
-            
-            # 创建新的K线对象
-            self.bar = VtBarData()
-            newMinute = True
-            
-        # 初始化新一分钟的K线数据
-        if newMinute:
-            self.bar.vtSymbol = tick.vtSymbol
-            self.bar.symbol = tick.symbol
-            self.bar.exchange = tick.exchange
-
-            self.bar.open = tick.lastPrice
-            self.bar.high = tick.lastPrice
-            self.bar.low = tick.lastPrice
-        # 累加更新老一分钟的K线数据
-        else:                                   
-            self.bar.high = max(self.bar.high, tick.lastPrice)
-            self.bar.low = min(self.bar.low, tick.lastPrice)
-
-        # 通用更新部分
-        self.bar.close = tick.lastPrice        
-        self.bar.datetime = tick.datetime  
-        self.bar.openInterest = tick.openInterest
-   
-        if self.lastTick:
-            volumeChange = tick.volume - self.lastTick.volume   # 当前K线内的成交量
-            self.bar.volume += max(volumeChange, 0)             # 避免夜盘开盘lastTick.volume为昨日收盘数据，导致成交量变化为负的情况
-            
-        # 缓存Tick
-        self.lastTick = tick
-
-    #----------------------------------------------------------------------
-    def updateBar(self, bar):
-        """1分钟K线更新"""
-        # 尚未创建对象
-        if not self.xminBar:
-            self.xminBar = VtBarData()
-            
-            self.xminBar.vtSymbol = bar.vtSymbol
-            self.xminBar.symbol = bar.symbol
-            self.xminBar.exchange = bar.exchange
-        
-            self.xminBar.open = bar.open
-            self.xminBar.high = bar.high
-            self.xminBar.low = bar.low            
-            
-            self.xminBar.datetime = bar.datetime    # 以第一根分钟K线的开始时间戳作为X分钟线的时间戳
-        # 累加老K线
-        else:
-            self.xminBar.high = max(self.xminBar.high, bar.high)
-            self.xminBar.low = min(self.xminBar.low, bar.low)
-    
-        # 通用部分
-        self.xminBar.close = bar.close        
-        self.xminBar.openInterest = bar.openInterest
-        self.xminBar.volume += int(bar.volume)                
-            
-        # X分钟已经走完
-        if not (bar.datetime.minute + 1) % self.xmin:   # 可以用X整除
-            # 生成上一X分钟K线的时间戳
-            self.xminBar.datetime = self.xminBar.datetime.replace(second=0, microsecond=0)  # 将秒和微秒设为0
-            self.xminBar.date = self.xminBar.datetime.strftime('%Y%m%d')
-            self.xminBar.time = self.xminBar.datetime.strftime('%H:%M:%S.%f')
-            
-            # 推送
-            self.onXminBar(self.xminBar)
-            
-            # 清空老K线缓存对象
-            self.xminBar = None
-
-    #----------------------------------------------------------------------
-    def generate(self):
-        """手动强制立即完成K线合成"""
-        self.onBar(self.bar)
-        self.bar = None
-
-
-
-########################################################################
-class ArrayManager(object):
-    """
-    K线序列管理工具，负责：
-    1. K线时间序列的维护
-    2. 常用技术指标的计算
-    """
-
-    #----------------------------------------------------------------------
-    def __init__(self, size=100):
-        """Constructor"""
-        self.count = 0                      # 缓存计数
-        self.size = size                    # 缓存大小
-        self.inited = False                 # True if count>=size
-        
-        self.openArray = np.zeros(size)     # OHLC
-        self.highArray = np.zeros(size)
-        self.lowArray = np.zeros(size)
-        self.closeArray = np.zeros(size)
-        self.volumeArray = np.zeros(size)
-        
-    #----------------------------------------------------------------------
-    def updateBar(self, bar):
-        """更新K线"""
-        self.count += 1
-        if not self.inited and self.count >= self.size:
-            self.inited = True
-        
-        self.openArray[0:self.size-1] = self.openArray[1:self.size]
-        self.highArray[0:self.size-1] = self.highArray[1:self.size]
-        self.lowArray[0:self.size-1] = self.lowArray[1:self.size]
-        self.closeArray[0:self.size-1] = self.closeArray[1:self.size]
-        self.volumeArray[0:self.size-1] = self.volumeArray[1:self.size]
-    
-        self.openArray[-1] = bar.open
-        self.highArray[-1] = bar.high
-        self.lowArray[-1] = bar.low        
-        self.closeArray[-1] = bar.close
-        self.volumeArray[-1] = bar.volume
-        
-    #----------------------------------------------------------------------
-    @property
-    def open(self):
-        """获取开盘价序列"""
-        return self.openArray
-        
-    #----------------------------------------------------------------------
-    @property
-    def high(self):
-        """获取最高价序列"""
-        return self.highArray
-    
-    #----------------------------------------------------------------------
-    @property
-    def low(self):
-        """获取最低价序列"""
-        return self.lowArray
-    
-    #----------------------------------------------------------------------
-    @property
-    def close(self):
-        """获取收盘价序列"""
-        return self.closeArray
-    
-    #----------------------------------------------------------------------
-    @property    
-    def volume(self):
-        """获取成交量序列"""
-        return self.volumeArray
-    
-    #----------------------------------------------------------------------
-    def sma(self, n, array=False):
-        """简单均线"""
-        result = talib.SMA(self.close, n)
-        if array:
-            return result
-        return result[-1]
-        
-    #----------------------------------------------------------------------
-    def std(self, n, array=False):
-        """标准差"""
-        result = talib.STDDEV(self.close, n)
-        if array:
-            return result
-        return result[-1]
-    
-    #----------------------------------------------------------------------
-    def cci(self, n, array=False):
-        """CCI指标"""
-        result = talib.CCI(self.high, self.low, self.close, n)
-        if array:
-            return result
-        return result[-1]
-        
-    #----------------------------------------------------------------------
-    def atr(self, n, array=False):
-        """ATR指标"""
-        result = talib.ATR(self.high, self.low, self.close, n)
-        if array:
-            return result
-        return result[-1]
-        
-    #----------------------------------------------------------------------
-    def rsi(self, n, array=False):
-        """RSI指标"""
-        result = talib.RSI(self.close, n)
-        if array:
-            return result
-        return result[-1]
-    
-    #----------------------------------------------------------------------
-    def macd(self, fastPeriod, slowPeriod, signalPeriod, array=False):
-        """MACD指标"""
-        macd, signal, hist = talib.MACD(self.close, fastPeriod,
-                                        slowPeriod, signalPeriod)
-        if array:
-            return macd, signal, hist
-        return macd[-1], signal[-1], hist[-1]
-    
-    #----------------------------------------------------------------------
-    def adx(self, n, array=False):
-        """ADX指标"""
-        result = talib.ADX(self.high, self.low, self.close, n)
-        if array:
-            return result
-        return result[-1]
-    
-    #----------------------------------------------------------------------
-    def boll(self, n, dev, array=False):
-        """布林通道"""
-        mid = self.sma(n, array)
-        std = self.std(n, array)
-        
-        up = mid + std * dev
-        down = mid - std * dev
-        
-        return up, down    
-    
-    #----------------------------------------------------------------------
-    def keltner(self, n, dev, array=False):
-        """肯特纳通道"""
-        mid = self.sma(n, array)
-        atr = self.atr(n, array)
-        
-        up = mid + atr * dev
-        down = mid - atr * dev
-        
-        return up, down
-    
-    #----------------------------------------------------------------------
-    def donchian(self, n, array=False):
-        """唐奇安通道"""
-        up = talib.MAX(self.high, n)
-        down = talib.MIN(self.low, n)
-        
-        if array:
-            return up, down
-        return up[-1], down[-1]
-    
 
 ########################################################################
 class CtaSignal(object):
@@ -647,9 +663,3 @@ class CtaSignal(object):
     def getSignalPos(self):
         """获取信号仓位"""
         return self.signalPos
-        
-        
-        
-        
-    
-    

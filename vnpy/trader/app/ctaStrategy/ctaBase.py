@@ -4,6 +4,9 @@
 本文件中包含了CTA模块中用到的一些基础设置、类和常量等。
 '''
 
+from datetime import time
+from pymongo import MongoClient, ASCENDING
+
 # CTA引擎中涉及的数据类定义
 from vnpy.trader.vtConstant import EMPTY_UNICODE, EMPTY_STRING, EMPTY_FLOAT, EMPTY_INT
 
@@ -56,3 +59,37 @@ class StopOrder(object):
         self.strategy = None             # 下停止单的策略对象
         self.stopOrderID = EMPTY_STRING  # 停止单的本地编号 
         self.status = EMPTY_STRING       # 停止单状态
+
+########################################################################
+# 自己定义的一些函数
+#-----------------------------------------------------
+def loadContractDetail(vtSymbol):
+    try:
+        # 设置MongoDB操作的超时时间为0.5秒
+        dbClient = MongoClient('localhost', 27017, connectTimeoutMS=500)
+        
+        # 调用server_info查询服务器状态，防止服务器异常并未连接成功
+        dbClient.server_info()
+    except ConnectionFailure:
+        print u'读取合约连接数据库失败'
+        
+    if dbClient:
+        db = dbClient['VnTrader_Contract']
+        collection = db['Detail']
+        symbol = ''.join([x for x in vtSymbol if x.isalpha()])
+        flt = {'symbol': symbol}
+        cursor = collection.find(flt)
+        if cursor:
+            Data = list(cursor)
+        else:
+            Data = []
+    else:
+        print u'读取合约参数失败'
+        Data = []
+    
+    if not Data:
+        return
+    
+    d = Data[0]
+    
+    return d

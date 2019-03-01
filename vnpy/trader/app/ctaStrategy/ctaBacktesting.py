@@ -247,7 +247,7 @@ class BacktestingEngine(object):
         else:
             count = initCursor.count() + self.dbCursor.count()
         self.output(u'载入完成，数据量：%s' %count)
-        
+        self.dbClient.close()
     #----------------------------------------------------------------------
     def runBacktesting(self):
         """运行回测"""
@@ -373,6 +373,7 @@ class BacktestingEngine(object):
                 trade.volume = order.totalVolume
                 trade.tradeTime = self.dt.strftime('%H:%M:%S')
                 trade.dt = self.dt
+                trade.datetime = self.dt
                 self.strategy.onTrade(trade)
                 
                 self.tradeDict[tradeID] = trade
@@ -436,6 +437,7 @@ class BacktestingEngine(object):
                 trade.volume = so.volume
                 trade.tradeTime = self.dt.strftime('%H:%M:%S')
                 trade.dt = self.dt
+                trade.datetime = self.dt
                 
                 self.tradeDict[tradeID] = trade
                 
@@ -604,6 +606,11 @@ class BacktestingEngine(object):
         """获取最小价格变动"""
         return self.priceTick
     
+    #----------------------------------------------------------------------
+    def send_strategy_account_to_bg(self):
+        """把策略的账户信息发送到后端监控（无效）"""
+        pass
+        
     #------------------------------------------------
     # 结果计算相关
     #------------------------------------------------      
@@ -846,34 +853,34 @@ class BacktestingEngine(object):
         self.output(u'盈亏比：\t%s' %formatNumber(d['profitLossRatio']))
     
         # 绘图
-        fig = plt.figure(figsize=(10, 16))
+        # fig = plt.figure(figsize=(10, 16))
         
-        pCapital = plt.subplot(4, 1, 1)
-        pCapital.set_ylabel("capital")
-        pCapital.plot(d['capitalList'], color='r', lw=0.8)
+        # pCapital = plt.subplot(4, 1, 1)
+        # pCapital.set_ylabel("capital")
+        # pCapital.plot(d['capitalList'], color='r', lw=0.8)
         
-        pDD = plt.subplot(4, 1, 2)
-        pDD.set_ylabel("DD")
-        pDD.bar(range(len(d['drawdownList'])), d['drawdownList'], color='g')
+        # pDD = plt.subplot(4, 1, 2)
+        # pDD.set_ylabel("DD")
+        # pDD.bar(range(len(d['drawdownList'])), d['drawdownList'], color='g')
         
-        pPnl = plt.subplot(4, 1, 3)
-        pPnl.set_ylabel("pnl")
-        pPnl.hist(d['pnlList'], bins=50, color='c')
+        # pPnl = plt.subplot(4, 1, 3)
+        # pPnl.set_ylabel("pnl")
+        # pPnl.hist(d['pnlList'], bins=50, color='c')
 
-        pPos = plt.subplot(4, 1, 4)
-        pPos.set_ylabel("Position")
-        if d['posList'][-1] == 0:
-            del d['posList'][-1]
-        tradeTimeIndex = [item.strftime("%m/%d %H:%M:%S") for item in d['tradeTimeList']]
-        xindex = np.arange(0, len(tradeTimeIndex), np.int(len(tradeTimeIndex)/10))
-        tradeTimeIndex = map(lambda i: tradeTimeIndex[i], xindex)
-        pPos.plot(d['posList'], color='k', drawstyle='steps-pre')
-        pPos.set_ylim(-1.2, 1.2)
-        plt.sca(pPos)
-        plt.tight_layout()
-        plt.xticks(xindex, tradeTimeIndex, rotation=30)  # 旋转15
+        # pPos = plt.subplot(4, 1, 4)
+        # pPos.set_ylabel("Position")
+        # if d['posList'][-1] == 0:
+            # del d['posList'][-1]
+        # tradeTimeIndex = [item.strftime("%m/%d %H:%M:%S") for item in d['tradeTimeList']]
+        # xindex = np.arange(0, len(tradeTimeIndex), np.int(len(tradeTimeIndex)/10))
+        # tradeTimeIndex = map(lambda i: tradeTimeIndex[i], xindex)
+        # pPos.plot(d['posList'], color='k', drawstyle='steps-pre')
+        # pPos.set_ylim(-1.2, 1.2)
+        # plt.sca(pPos)
+        # plt.tight_layout()
+        # plt.xticks(xindex, tradeTimeIndex, rotation=30)  # 旋转15
         
-        plt.show()
+        # plt.show()
     
     #----------------------------------------------------------------------
     def clearBacktestingResult(self):
@@ -891,6 +898,7 @@ class BacktestingEngine(object):
         # 清空成交相关
         self.tradeCount = 0
         self.tradeDict.clear()
+        self.dailyResultDict.clear()
         
     #----------------------------------------------------------------------
     def runOptimization(self, strategyClass, optimizationSetting):
@@ -917,7 +925,7 @@ class BacktestingEngine(object):
                 targetValue = d[targetName]
             except KeyError:
                 targetValue = 0
-            resultList.append(([str(setting)], targetValue, d))
+            resultList.append((str(setting), targetValue, d))
         
         # 显示结果
         resultList.sort(reverse=True, key=lambda result:result[1])
@@ -1050,6 +1058,8 @@ class BacktestingEngine(object):
         annualizedReturn = totalReturn / totalDays * 240
         dailyReturn = df['return'].mean() * 100
         returnStd = df['return'].std() * 100
+        tradeYears = float((endDate - startDate).days) / 365
+        returnRiskRatio = (totalNetPnl / tradeYears) / abs(maxDrawdown)
         
         if returnStd:
             sharpeRatio = dailyReturn / returnStd * np.sqrt(240)
@@ -1080,7 +1090,8 @@ class BacktestingEngine(object):
             'annualizedReturn': annualizedReturn,
             'dailyReturn': dailyReturn,
             'returnStd': returnStd,
-            'sharpeRatio': sharpeRatio
+            'sharpeRatio': sharpeRatio,
+            'returnRiskRatio': returnRiskRatio
         }
         
         return df, result
@@ -1124,26 +1135,49 @@ class BacktestingEngine(object):
         self.output(u'日均收益率：\t%s%%' % formatNumber(result['dailyReturn']))
         self.output(u'收益标准差：\t%s%%' % formatNumber(result['returnStd']))
         self.output(u'Sharpe Ratio：\t%s' % formatNumber(result['sharpeRatio']))
+        self.output(u'收益风险比：\t%s' % formatNumber(result['returnRiskRatio']))
         
         # 绘图
-        fig = plt.figure(figsize=(10, 16))
+        font = {'family': 'serif',
+        'color':  'black',
+        'weight': 'bold',
+        'size': 14,
+        }
+        fig = plt.figure(figsize=(15, 5))
+            
+        pBalance = plt.subplot(2, 2, 1)
+        pBalance.set_title('Balance', fontdict=font)
+        pBalance.set_xlim([df.index.min(), df.index.max()])
+        ln_1 = pBalance.plot(df.index, df['balance'], '-b', linewidth=2, label='Balance')
+        pClose = pBalance.twinx()
+        ln_2 = pClose.plot(df.index, df['closePrice'], '-k', linewidth=1, label='Close Price')
+        lns = ln_1 + ln_2
+        labs = [l.get_label() for l in lns]
+        pBalance.legend(lns, labs, loc=0)
+        ax = plt.gca()  # 获取当前轴
+        ax.locator_params('y', nbins=10)
+        ax.grid()
+        pBalance.set_ylabel('Balance', fontdict=font)
+        pClose.set_ylabel('Close Price', fontdict=font)
         
-        pBalance = plt.subplot(4, 1, 1)
-        pBalance.set_title('Balance')
-        df['balance'].plot(legend=True)
+        pDrawdown = plt.subplot(2, 2, 3)
+        pDrawdown.set_title('Drawdown', fontdict=font)
+        pDrawdown.set_xlim([df.index.min(), df.index.max()])
+        pDrawdown.fill_between(df.index, df['drawdown'].values)
+        ax = plt.gca()  # 获取当前轴
+        ax.locator_params('y', nbins=10)
         
-        pDrawdown = plt.subplot(4, 1, 2)
-        pDrawdown.set_title('Drawdown')
-        pDrawdown.fill_between(range(len(df)), df['drawdown'].values)
+        pPnl = plt.subplot(2, 2, 2)
+        pPnl.set_title('Daily Pnl', fontdict=font) 
+        pPnl.set_xlim([df.index.min(), df.index.max()])
+        plt.plot(df.index, df['netPnl'], '.b')
         
-        pPnl = plt.subplot(4, 1, 3)
-        pPnl.set_title('Daily Pnl') 
-        df['netPnl'].plot(kind='bar', legend=False, grid=False, xticks=[])
-
-        pKDE = plt.subplot(4, 1, 4)
-        pKDE.set_title('Daily Pnl Distribution')
+        
+        pKDE = plt.subplot(2, 2, 4)
+        pKDE.set_title('Daily Pnl Distribution', fontdict=font)
         df['netPnl'].hist(bins=50)
-        
+
+        plt.tight_layout()
         plt.show()
        
         
@@ -1245,6 +1279,10 @@ class OptimizationSetting(object):
         
         self.optimizeTarget = ''        # 优化目标字段
         
+        #如果两个参数存在大小关系
+        self.largerParameter = None 
+        self.smallerParameter = None
+        
     #----------------------------------------------------------------------
     def addParameter(self, name, start, end=None, step=None):
         """增加优化参数"""
@@ -1283,8 +1321,12 @@ class OptimizationSetting(object):
         settingList = []
         for p in productList:
             d = dict(zip(nameList, p))
+            #r如果策略中一个参数必须大于另一个参数
+            if self.largerParameter in d.keys() and self.smallerParameter in d.keys():
+                if d[self.largerParameter] <= d[self.smallerParameter]:
+                    continue
             settingList.append(d)
-    
+            
         return settingList
     
     #----------------------------------------------------------------------
